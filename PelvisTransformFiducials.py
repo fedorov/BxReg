@@ -20,7 +20,7 @@ def TransformFiducials(ref, mov, fidIn, tfmIn, fidOut):
 
  CMD="~/bitbucket/SlicerCLITools-build/TransformFiducialList --referenceimage "+ref+" --movingimage "+mov+" --fiducialsfile "+fidIn+" --inputtransform "+tfmIn+" --outputfile "+fidOut
  print CMD
-  
+
  ret = os.system(CMD)
  if ret:
    exit()
@@ -62,6 +62,8 @@ for ni in needleImages:
     needleImageIds.append(int(string.split(fname,'.')[0]))
 needleImageIds.sort()
 
+print needleImageIds
+
 # moving image/mask will always be the same
 movingImage = IntraDir+'/CoverProstate.nrrd'
 
@@ -82,10 +84,10 @@ for nid in needleImageIds:
 
   resampled = ResDir+'/'+nidStr+'-Pelvis-RigidRegistered-centroid.fcsv'
   fidList = IntraDir+'/CoverProstate-Centroid.fcsv'
- 
+
   #if not IsBSplineTfmValid(bsplineTfm):
   #  print 'BSpline transform is not valid! Will skip needle image ',nid
   #  continue
 
   TransformFiducials(ref=fixedImage,mov=movingImage,fidIn=fidList,tfmIn=bsplineTfm,fidOut=resampled)
-  # BFResample(reference=fixedImage,moving=movingImage,tfm=bsplineTfm,output=resampled)  
+  # BFResample(reference=fixedImage,moving=movingImage,tfm=bsplineTfm,output=resampled)

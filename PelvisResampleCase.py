@@ -1,8 +1,9 @@
 import os, argparse, string, re, sys, glob
 from time import time
 
+SLICER="/home/fedorov/src/Release/Slicer3-build/Slicer3"
 def BFResample(reference,moving,tfm,output,interp='Linear'):
-  CMD = 'Slicer3 --launch BRAINSResample --referenceVolume '+reference+' --inputVolume '+moving+' --outputVolume '+output+' --warpTransform '+tfm
+  CMD = SLICER+' --launch BRAINSResample --referenceVolume '+reference+' --inputVolume '+moving+' --outputVolume '+output+' --warpTransform '+tfm
   CMD = CMD + ' --interpolationMode '+interp
   ret = os.system(CMD)
   if ret:
@@ -23,9 +24,9 @@ args = parser.parse_args()
 
 case = args.case
 
-IntraDir = 'Case'+case+'/IntraopImages'
-RegDir = 'Case'+case+'/PelvisRegistration2attempts'
-ResDir='PelvisRegistrationVisualVerification/Case'+case
+IntraDir = 'Data/Case'+case+'/IntraopImages'
+RegDir = 'Data/Case'+case+'/Slicer3registration.pelvis'
+ResDir='Slicer3verification.pelvis/Case'+case
 TempDir='TempDir'
 try:
   os.mkdir(ResDir)
@@ -63,4 +64,4 @@ for nid in needleImageIds:
     exit()
 
   resampled = ResDir+'/'+nidStr+'-Rigid_resampled.nrrd'
-  BFResample(reference=fixedImage,moving=movingImage,tfm=rigidTfm,output=resampled)  
+  BFResample(reference=fixedImage,moving=movingImage,tfm=rigidTfm,output=resampled)

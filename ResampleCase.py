@@ -2,7 +2,7 @@ import os, argparse, string, re, sys, glob
 from time import time
 
 def BFResample(reference,moving,tfm,output,interp='Linear'):
-  CMD = 'Slicer3 --launch BRAINSResample --referenceVolume '+reference+' --inputVolume '+moving+' --outputVolume '+output+' --warpTransform '+tfm
+  CMD = '/home/fedorov/src/Release/Slicer3-build/Slicer3 --launch BRAINSResample --referenceVolume '+reference+' --inputVolume '+moving+' --outputVolume '+output+' --warpTransform '+tfm
   CMD = CMD + ' --interpolationMode '+interp
   ret = os.system(CMD)
   if ret:
@@ -23,9 +23,9 @@ args = parser.parse_args()
 
 case = args.case
 
-IntraDir = 'Case'+case+'/IntraopImages'
-RegDir = 'Case'+case+'/Registration2attempts'
-ResDir='RegistrationVisualVerification/Case'+case
+IntraDir = 'Data/Case'+case+'/IntraopImages'
+RegDir = 'Data/Case'+case+'/Slicer3registration'
+ResDir='Slicer3verification/Case'+case
 TempDir='TempDir'
 try:
   os.mkdir(ResDir)
@@ -63,9 +63,9 @@ for nid in needleImageIds:
     exit()
 
   resampled = ResDir+'/'+nidStr+'-BSpline_resampled.nrrd'
- 
+
   if not IsBSplineTfmValid(bsplineTfm):
     print 'BSpline transform is not valid! Will skip needle image ',nid
     continue
 
-  BFResample(reference=fixedImage,moving=movingImage,tfm=bsplineTfm,output=resampled)  
+  BFResample(reference=fixedImage,moving=movingImage,tfm=bsplineTfm,output=resampled)

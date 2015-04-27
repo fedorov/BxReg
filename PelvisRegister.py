@@ -1,11 +1,16 @@
 import os, argparse, string, re, sys, glob
 from time import time
 
+SLICER="/home/fedorov/src/Release/Slicer3-build/Slicer3"
+
 def BFRegister(fixed=None,moving=None,fixedMask=None,movingMask=None,rigidTfm=None,affineTfm=None,bsplineTfm=None,initializer=None,log=None,initTfm=None,initialTfm=None):
+  CMD=SLICER+" --launch BRAINSFitIGT --fixedVolume "+fixed+" --movingVolume "+moving+" --debugNumberOfThreads 1 --maskProcessingMode ROI --numberOfIterations 500 "
+  '''
   if fixedMask != None or movingMask != None:
     CMD="Slicer3 --launch BRAINSFitIGT --fixedVolume "+fixed+" --movingVolume "+moving+" --debugNumberOfThreads 1 --maskProcessingMode ROI --numberOfIterations 500 "
   else:
     CMD="Slicer3 --launch BRAINSFitIGT --fixedVolume "+fixed+" --movingVolume "+moving+" --debugNumberOfThreads 1 --maskProcessingMode NOMASK --numberOfIterations 500 "
+  '''
 
   if fixedMask:
     CMD = CMD+" --fixedBinaryVolume "+fixedMask
@@ -20,7 +25,7 @@ def BFRegister(fixed=None,moving=None,fixedMask=None,movingMask=None,rigidTfm=No
   if affineTfm:
     CMD = CMD+" --useAffine --affineTransformDebug "+affineTfm
   if bsplineTfm:
-    CMD = CMD+" --useROIBSpline --bsplineTransform "+bsplineTfm  
+    CMD = CMD+" --useROIBSpline --bsplineTransform "+bsplineTfm
   #CMD = CMD+" --useGeometryAlign "
   #if fixedMask and movingMask:
   #  CMD = CMD+' --useCenterOfROIAlign '
@@ -38,7 +43,7 @@ def BFRegister(fixed=None,moving=None,fixedMask=None,movingMask=None,rigidTfm=No
     exit()
 
 def BFResample(reference,moving,tfm,output,interp='Linear'):
-  CMD = 'Slicer3 --launch BRAINSResample --referenceVolume '+reference+' --inputVolume '+moving+' --outputVolume '+output+' --warpTransform '+tfm
+  CMD = SLICER+' --launch BRAINSResample --referenceVolume '+reference+' --inputVolume '+moving+' --outputVolume '+output+' --warpTransform '+tfm
   CMD = CMD + ' --interpolationMode '+interp
   ret = os.system(CMD)
   if ret:
@@ -61,8 +66,8 @@ args = parser.parse_args()
 case = args.case
 needleReq = args.needle
 
-IntraDir = 'Case'+case+'/IntraopImages'
-RegDir='Case'+case+'/PelvisRegistration2attempts'
+IntraDir = 'Data/Case'+case+'/IntraopImages'
+RegDir='Data/Case'+case+'/Slicer3registration.pelvis'
 TempDir='TempDir'
 try:
   os.mkdir(RegDir)
@@ -133,7 +138,7 @@ for nid in needleImageIds:
     startTime = time()
     BFRegister(fixed=fixedImage,moving=movingImage,movingMask=movingMask,fixedMask=fixedMask,rigidTfm=rigidTfm,log=log,initTfm=initTfm)
     endTime = time()
-    attempt='Attempt1'
+    attempt='Attempt2'
 
   latestRigidTfm = rigidTfm
 
@@ -142,7 +147,7 @@ for nid in needleImageIds:
 
   #   prepare the parameters
   #   2.1: run with the CoverProstate mask only first
-  
+
   rigidTfm = RegDir+'/'+nidStr+'_IntraIntraRigid_FixedMaskOnly.tfm'
   #affineTfm = RegDir+'/'+nidStr+'_IntraIntraAffine_FixedMaskOnly.tfm'
   bsplineTfm = RegDir+'/'+nidStr+'_IntraIntraBSpline_FixedMaskOnly.tfm'
@@ -155,8 +160,8 @@ for nid in needleImageIds:
     BFRegister(fixed=fixedImage,moving=movingImage,fixedMask=movingMaskResampled,rigidTfm=rigidTfm,affineTfm=affineTfm,bsplineTfm=bsplineTfm,log=log,initialTfm=latestRigidTfm)
   else:
 
- 
-  
+
+
   # 2.2: run with the same mask for fixed and moving
   rigidTfm = RegDir+'/'+nidStr+'_IntraIntraRigid_SameFixedMovingMasks.tfm'
   #affineTfm = RegDir+'/'+nidStr+'_IntraIntraAffine_SameFixedMovingMasks.tfm'
@@ -165,7 +170,7 @@ for nid in needleImageIds:
 
   BFRegister(fixed=fixedImage,moving=movingImage,movingMask=movingMask,fixedMask=movingMask,rigidTfm=rigidTfm,affineTfm=affineTfm,bsplineTfm=bsplineTfm,log=log)
   success = success or IsBSplineTfmValid(bsplineTfm)
-  
+
 
   # 2.3: run with the latest needle confirmation mask available
   rigidTfm = RegDir+'/'+nidStr+'_IntraIntraRigid_LatestMask.tfm'
@@ -173,7 +178,7 @@ for nid in needleImageIds:
   bsplineTfm = RegDir+'/'+nidStr+'_IntraIntraBSpline_LatestMask.tfm'
   initTfm = RegDir+'/'+nidStr+'_IntraIntraInit_LatestMask.tfm'
   log = RegDir+'/'+nidStr+'_LatestMask.log'
-  
+
   latestFixedMask=None
   for nidtg in needleImageIds:
     if nidtg>nid:
@@ -191,17 +196,17 @@ for nid in needleImageIds:
 
     success = success or IsBSplineTfmValid(bsplineTfm)
 
-    
+
     # 2.4: take the initial transform and run with just the fixed mask
     rigidTfm = RegDir+'/'+nidStr+'_IntraIntraRigid_WithInitTfm.tfm'
     #affineTfm = RegDir+'/'+nidStr+'_IntraIntraAffine_LatestMask.tfm'
     bsplineTfm = RegDir+'/'+nidStr+'_IntraIntraBSpline_WithInitTfm.tfm'
     log = RegDir+'/'+nidStr+'_WithInitTfm.log'
-  
+
     # NOTE: no moving mask!
-    BFRegister(fixed=fixedImage,moving=movingImage,fixedMask=latestFixedMask,rigidTfm=rigidTfm,affineTfm=affineTfm,bsplineTfm=bsplineTfm,log=log,initialTfm=initTfm)   
+    BFRegister(fixed=fixedImage,moving=movingImage,fixedMask=latestFixedMask,rigidTfm=rigidTfm,affineTfm=affineTfm,bsplineTfm=bsplineTfm,log=log,initialTfm=initTfm)
     success = success or IsBSplineTfmValid(bsplineTfm)
-    
+
   else:
     print 'Cannot do mode 2.3 because no needle image masks found!'
 

@@ -1,6 +1,8 @@
 import os, argparse, string, re, sys, glob
 from time import time
 
+structure = ''
+
 def BFResample(reference,moving,tfm,output,interp='Linear'):
   CMD = 'Slicer3 --launch BRAINSResample --referenceVolume '+reference+' --inputVolume '+moving+' --outputVolume '+output+' --warpTransform '+tfm
   CMD = CMD + ' --interpolationMode '+interp
@@ -20,7 +22,7 @@ def TransformFiducials(ref, mov, fidIn, tfmIn, fidOut):
 
  CMD="~/bitbucket/SlicerCLITools-build/TransformFiducialList --referenceimage "+ref+" --movingimage "+mov+" --fiducialsfile "+fidIn+" --inputtransform "+tfmIn+" --outputfile "+fidOut
  print CMD
-  
+
  ret = os.system(CMD)
  if ret:
    exit()
@@ -40,10 +42,15 @@ args = parser.parse_args()
 
 case = args.case
 
-IntraDir = 'Case'+case+'/IntraopImages'
+IntraDir = 'Data/Case'+case+'/IntraopImages'
 #RegDir = 'Case'+case+'/PelvisRegistration2attempts'
-RegDir = 'Case'+case+'/Registration2attempts'
-ResDir='RegistrationVisualVerification/Case'+case
+if structure == "Pelvis":
+  RegDir = 'Data/Case'+case+'/Slicer3registration.pelvis'
+  ResDir='Slicer3verification.pelvis/Case'+case
+else:
+  RegDir = 'Data/Case'+case+'/Slicer3registration'
+  ResDir='Slicer3verification/Case'+case
+
 TempDir='TempDir'
 try:
   os.mkdir(ResDir)
@@ -73,22 +80,32 @@ for nid in needleImageIds:
   fixedImage = IntraDir+'/'+nidStr+'.nrrd'
 
   # check if there is a matching TG
-  bsplineTfm = RegDir+'/'+nidStr+'-IntraIntra-BSpline-Attempt2.tfm'
+  if structure == 'Pelvis':
+    bsplineTfm = RegDir+'/'+nidStr+'-IntraIntra-Rigid-Attempt2.tfm'
+  else:
+    bsplineTfm = RegDir+'/'+nidStr+'-IntraIntra-BSpline-Attempt2.tfm'
+
   if not os.path.isfile(bsplineTfm):
-    bsplineTfm = RegDir+'/'+nidStr+'-IntraIntra-BSpline-Attempt1.tfm'
+    if structure == 'Pelvis':
+      bsplineTfm = RegDir+'/'+nidStr+'-IntraIntra-Rigid-Attempt1.tfm'
+    else:
+      bsplineTfm = RegDir+'/'+nidStr+'-IntraIntra-BSpline-Attempt1.tfm'
   if not os.path.isfile(bsplineTfm):
     print 'Failed to find ANY transform!'
     exit()
 
-  #resampled = ResDir+'/'+nidStr+'-Pelvis-RigidRegistered-centroid.fcsv'
-  # resampled = ResDir+'/'+nidStr+'-BSplineRegistered-centroid.fcsv'
-  # fidList = IntraDir+'/CoverProstate-Centroid.fcsv'
-  resampled = ResDir+'/'+nidStr+'-BSplineRegistered-targets.fcsv'
-  fidList = IntraDir+'/Case'+case+'_CoverProstate-registered_targets.fcsv'
- 
+  if structure == 'Pelvis':
+    resampled = ResDir+'/'+nidStr+'-Pelvis-RigidRegistered-centroid.fcsv'
+  else:
+    resampled = ResDir+'/'+nidStr+'-BSplineRegistered-centroid.fcsv'
+
+  fidList = IntraDir+'/CoverProstate-Centroid.fcsv'
+  #resampled = ResDir+'/'+nidStr+'-BSplineRegistered-targets.fcsv'
+  #fidList = IntraDir+'/Case'+case+'_CoverProstate-registered_targets.fcsv'
+
   #if not IsBSplineTfmValid(bsplineTfm):
   #  print 'BSpline transform is not valid! Will skip needle image ',nid
   #  continue
 
   TransformFiducials(ref=fixedImage,mov=movingImage,fidIn=fidList,tfmIn=bsplineTfm,fidOut=resampled)
-  # BFResample(reference=fixedImage,moving=movingImage,:tfm=bsplineTfm,output=resampled)  
+  # BFResample(reference=fixedImage,moving=movingImage,:tfm=bsplineTfm,output=resampled)

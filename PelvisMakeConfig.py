@@ -1,34 +1,22 @@
 import os, argparse, string, re, sys, glob
+import ConfigParser as conf
 from time import time
 
-def BFResample(reference,moving,tfm,output,interp='Linear'):
-  CMD = 'Slicer3 --launch BRAINSResample --referenceVolume '+reference+' --inputVolume '+moving+' --outputVolume '+output+' --warpTransform '+tfm
-  CMD = CMD + ' --interpolationMode '+interp
-  ret = os.system(CMD)
-  if ret:
-    exit()
-
-def IsBSplineTfmValid(tfm):
-  f=open(tfm,'r')
-  nTransforms = 0
-  for l in f:
-    if string.find(l,'# Transform') != -1:
-      nTransforms = nTransforms+1
-  return nTransforms == 2
-
-parser = argparse.ArgumentParser(description="Run various registration experiments for a given case number")
+parser = argparse.ArgumentParser(description="Prepare configuration file for Slicer VisAIRe module")
 parser.add_argument('case',help='case to be processed')
 
 args = parser.parse_args()
 
 case = args.case
 
-IntraDir = 'Case'+case+'/IntraopImages'
-RegDir = 'Case'+case+'/PelvisRegistration2attempts'
-ResDir='PelvisRegistrationVisualVerification/Case'+case
+IntraDir = 'Data/Case'+case+'/IntraopImages'
+RegDir = 'Data/Case'+case+'/Slicer3registration.pelvis'
+ResDir='Slicer3verification.pelvis/Case'+case
+SegDir='Segmentations/Case'+case+'-ManualSegmentations'
 
 #   list all needle image ids first
 needleImageIds = []
+segImageIds = []
 needleImages = glob.glob(IntraDir+'/[0-9]*nrrd')
 for ni in needleImages:
   fname = string.split(ni,'/')[-1]
@@ -36,36 +24,64 @@ for ni in needleImages:
   # keep only those images that look like 10.nrrd
   if re.match('\d+\.nrrd',fname):
     needleImageIds.append(int(string.split(fname,'.')[0]))
+    #if os.path.exists(IntraDir+'/'+int(needleImageIds[-1])+'-label.nrrd'):
+    #  segImageIds.append(needleImageIds[-1])
 needleImageIds.sort()
 
-configFile = open('PelvisRegistrationVisualVerification/Case'+case+'_VisAIRe.conf','w')
+
+cf = conf.SafeConfigParser()
+cf.optionxform = str
+cfFileName = 'Slicer3verification.pelvis/Case'+case+'_VisAIRe.ini'
+
+cfFile = open(cfFileName,'w')
 
 # moving image/mask will always be the same
 movingImage = IntraDir+'/CoverProstate.nrrd'
+segImage = SegDir+'/CoverProstate-label.nrrd'
 
-configFile.write('[MovingImage]\n')
-configFile.write(os.path.abspath(movingImage)+'\n')
+cf.add_section('MovingData')
+cf.set('MovingData','ImagesPath',IntraDir)
+cf.set('MovingData','SegmentationsPath',SegDir)
+cf.set('MovingData','Image',os.path.abspath(movingImage))
+cf.set('MovingData','Segmentation',os.path.abspath(segImage))
 
-configFile.write('[FixedImages]\n')
+cf.add_section('FixedData')
+cf.set('FixedData','ImagesPath',IntraDir)
+
 for nid in needleImageIds:
   nidStr=str(nid)
-  fixedImage = IntraDir+'/'+nidStr+'.nrrd'
-  configFile.write(os.path.abspath(fixedImage)+'\n')
+  cf.set('FixedData','Image'+nidStr,os.path.join(os.path.abspath(IntraDir),nidStr+'.nrrd'))
 
-configFile.write('[RegisteredImages]\n')
+cf.add_section('RegisteredData')
+cf.set('RegisteredData','ImagesPath',ResDir)
+cf.set('RegisteredData','TransformsDir',RegDir)
 for nid in needleImageIds:
   nidStr=str(nid)
-  resampled = ResDir+'/'+nidStr+'-Rigid_resampled.nrrd'
-  configFile.write(os.path.abspath(resampled)+'\n')
+  cf.set('RegisteredData','Image'+nidStr,os.path.join(os.path.abspath(ResDir),nidStr+'-Rigid_resampled.nrrd'))
+  # TODO: add transformations
+  tfmFile1 = RegDir+'/'+nidStr+'-IntraIntra-Rigid-Attempt1.tfm'
+  tfmFile2 = RegDir+'/'+nidStr+'-IntraIntra-Rigid-Attempt2.tfm'
+  if os.path.exists(tfmFile1):
+    cf.set('RegisteredData','Transform'+nidStr,os.path.abspath(tfmFile1))
+  elif os.path.exists(tfmFile2):
+    cf.set('RegisteredData','Transform'+nidStr,os.path.abspath(tfmFile2))
+  else:
+    break
+    assert False
+  # add segmentations
 
 # assessment questions; format:
 #   comment; type=[binary,number];
-configFile.write('[AssessmentQuestions]\n')
-configFile.write('Did registration improve alignment?;binary;\n')
-configFile.write('Is registered image of diagnostic quality?;binary;\n')
-configFile.write('Quantitative assessment of mis-registration (if available);numeric;\n')
+cf.add_section('Questions')
+cf.set('Questions','Question1','Did registration improve alignment?;binary;')
+cf.set('Questions','Question2','Is registered image of diagnostic quality?;binary;')
+cf.set('Questions','Question3','Quantitative assessment of mis-registration (if available);numeric;')
 
-configFile.write('[CaseName]\n')
-configFile.write('BxCase'+case+'\n')
 
-configFile.close()
+cf.add_section('Info')
+cf.set('Info','CaseName','BxCase'+case)
+
+cf.write(cfFile)
+cfFile.close()
+
+print 'Config file saved as ',cfFileName
